@@ -11,7 +11,9 @@ from .prioritize import prioritize_candidates
 from .tables import cell_tcr_table, strict_clone_table
 from .phenotype import candidate_phenotype_table, clone_phenotype_association, infer_phenotype_score_columns
 from .claims import claim_checker
+from .audit import audit_cell_metadata, audit_result_dirs, audit_results_root
 from .figures import create_benchmark_figures
+from .prefilter import prefilter_cell_metadata
 from .reporting import report_batch_summary, report_candidate_cards, report_clone_cards, report_markdown_summary
 from .pipeline import discover_result_dirs, run_tcr_claim_batch, run_tcr_claim_pipeline, summarize_tcr_claim_outputs
 from .supplements import create_supplement_tables
@@ -36,6 +38,10 @@ __all__ = [
     "clone_phenotype_association",
     "infer_phenotype_score_columns",
     "claim_checker",
+    "audit_cell_metadata",
+    "audit_result_dirs",
+    "audit_results_root",
+    "prefilter_cell_metadata",
     "discover_result_dirs",
     "run_tcr_claim_batch",
     "run_tcr_claim_pipeline",

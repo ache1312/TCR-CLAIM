@@ -102,6 +102,8 @@ tcr-claim-tables --input cell_metadata_with_tcr.csv --out tcr_claim_outputs
 tcr-claim-batch --results-root results --out tcr_claim_batch
 tcr-claim-supplements --batch-root tcr_claim_batch
 tcr-claim-figures --batch-root tcr_claim_batch
+tcr-claim-audit --results-root results --out dataset_audit
+tcr-claim-prefilter --input results/gse200996/cell_metadata_with_tcr.csv --out filtered/cell_metadata_with_tcr.csv
 tcr-claim-validate --results-dir results/io_dataset --out validation.csv
 tcr-claim-validate-batch --results results/io_dataset,results/gse121637 --out batch_validation.csv
 ```
@@ -189,3 +191,32 @@ Figure SVGs:
 - `fig_candidate_count_by_dataset.svg`
 - `fig_collapse_risk_distribution.svg`
 - `fig_tcr_claim_flow.svg`
+
+## Large Dataset Audit And Prefilter
+
+Audit all benchmark result folders:
+
+```bash
+tcr-claim-audit \
+  --results-root /path/to/benchmark/results \
+  --out dataset_audit
+```
+
+Prefilter a large `cell_metadata_with_tcr.csv` to paired CD4/CD8 rows:
+
+```bash
+tcr-claim-prefilter \
+  --input /path/to/gse200996/cell_metadata_with_tcr.csv \
+  --out filtered_gse200996/cell_metadata_with_tcr.csv \
+  --chunksize 250000
+```
+
+The repository also includes a long-running benchmark job script:
+
+```bash
+RUN_ROOT=validation/long_runs/gse200996_prefilter_$(date +%Y%m%d_%H%M%S)
+mkdir -p "$RUN_ROOT"
+nohup bash scripts/run_gse200996_prefilter_job.sh "$RUN_ROOT" \
+  > "$RUN_ROOT/job.log" 2>&1 &
+echo $! > "$RUN_ROOT/job.pid"
+```

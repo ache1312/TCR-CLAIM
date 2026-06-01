@@ -6,10 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .audit import audit_result_dirs, audit_results_root
 from .io import read_table
 from .metrics import clone_count_agreement, tissue_sharing
 from .pipeline import discover_result_dirs, run_tcr_claim_batch, run_tcr_claim_pipeline
 from .figures import create_benchmark_figures
+from .prefilter import prefilter_cell_metadata
 from .supplements import create_supplement_tables
 
 
@@ -116,6 +118,47 @@ def figures_main(argv: list[str] | None = None) -> None:
     outputs = create_benchmark_figures(args.batch_root, args.out)
     destination = Path(args.out) if args.out else Path(args.batch_root) / "figures"
     print(f"Wrote {len(outputs)} figures to {destination.resolve()}")
+
+
+def audit_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Audit TCR-CLAIM benchmark dataset inclusion and primary universe eligibility.")
+    parser.add_argument("--results-root", help="Root directory to search for cell_metadata_with_tcr.csv files.")
+    parser.add_argument("--results", help="Comma-separated result directories.")
+    parser.add_argument("--out", required=True, help="Output directory for audit tables and Markdown report.")
+    parser.add_argument("--chunksize", type=int, default=250_000)
+    parser.add_argument("--cell-classes", default="CD4,CD8")
+    args = parser.parse_args(argv)
+
+    cell_classes = tuple(_split_csv_arg(args.cell_classes))
+    if args.results:
+        result_dirs = [Path(result) for result in _split_csv_arg(args.results)]
+        summary, _ = audit_result_dirs(result_dirs, args.out, chunksize=args.chunksize, allowed_cell_classes=cell_classes)
+    elif args.results_root:
+        summary, _ = audit_results_root(args.results_root, args.out, chunksize=args.chunksize, allowed_cell_classes=cell_classes)
+    else:
+        raise SystemExit("Provide --results or --results-root.")
+    print(f"Wrote audit for {len(summary)} datasets to {Path(args.out).resolve()}")
+
+
+def prefilter_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Prefilter a large cell_metadata_with_tcr.csv table in chunks.")
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--out", required=True, help="Filtered output CSV path.")
+    parser.add_argument("--chunksize", type=int, default=250_000)
+    parser.add_argument("--cell-classes", default="CD4,CD8")
+    parser.add_argument("--allow-unpaired", action="store_true", help="Do not require both ct_strict and ct_vgene.")
+    args = parser.parse_args(argv)
+
+    summary = prefilter_cell_metadata(
+        args.input,
+        args.out,
+        chunksize=args.chunksize,
+        allowed_cell_classes=tuple(_split_csv_arg(args.cell_classes)),
+        require_paired_tcr=not args.allow_unpaired,
+    )
+    print(f"Wrote filtered metadata to {Path(args.out).resolve()}")
+    print(f"Input rows: {summary['n_input_rows']}")
+    print(f"Output rows: {summary['n_output_rows']}")
 
 
 def validate_main(argv: list[str] | None = None) -> None:

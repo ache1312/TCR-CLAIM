@@ -132,6 +132,23 @@ that size are recorded as `skip_large_input` rather than silently producing
 multi-GB intermediate files. Use `--max-input-rows 0` only for intentional large
 dataset runs or after implementing a streaming/pre-filtered workflow.
 
+## Dataset Audit And Large-Input Prefilter
+
+`tcr-claim-audit` audits benchmark result folders in chunks and reports:
+
+- row count;
+- presence of `cell_class`, `ct_strict` and `ct_vgene`;
+- paired-TCR count;
+- primary CD4/CD8 paired-TCR count;
+- `cell_class` label distribution;
+- dataset status such as `ok`, `no_paired_tcr` or `zero_primary_universe`.
+
+`tcr-claim-prefilter` writes a reduced `cell_metadata_with_tcr.csv` in chunks.
+By default it keeps rows with both `ct_strict` and `ct_vgene` and `cell_class`
+in `CD4,CD8`. This is the preferred path for very large inputs such as
+`gse200996`, where writing an unfiltered full `cell_tcr_table.csv` can create
+multi-GB intermediates.
+
 ## Supplemental Tables
 
 The supplement generator turns a batch output root into:

@@ -425,3 +425,45 @@ def test_batch_pipeline_can_skip_large_inputs(tmp_path):
 
     assert summary.iloc[0]["status"] == "skip_large_input"
     assert summary.iloc[0]["n_input_rows"] == 2
+
+
+def test_dataset_audit_reports_zero_primary_universe(tmp_path):
+    result_dir = tmp_path / "results" / "nk_only"
+    result_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "cell_class": ["NK", "NK"],
+            "ct_strict": ["strict_a", "strict_b"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    ).to_csv(result_dir / "cell_metadata_with_tcr.csv", index=False)
+
+    summary, cell_counts = tb.audit_result_dirs([result_dir], tmp_path / "audit", chunksize=1)
+
+    assert summary.iloc[0]["status"] == "zero_primary_universe"
+    assert summary.iloc[0]["n_paired_tcr"] == 2
+    assert summary.iloc[0]["n_primary_cd4_cd8_paired"] == 0
+    assert cell_counts.iloc[0]["cell_class"] == "NK"
+    assert (tmp_path / "audit" / "dataset_audit_report.md").exists()
+
+
+def test_prefilter_cell_metadata_keeps_paired_cd4_cd8_rows(tmp_path):
+    input_path = tmp_path / "cell_metadata_with_tcr.csv"
+    output_path = tmp_path / "filtered" / "cell_metadata_with_tcr.csv"
+    pd.DataFrame(
+        {
+            "cell_class": ["CD8", "NK", "CD4", "CD8"],
+            "ct_strict": ["strict_a", "strict_b", "", "strict_d"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV1_TRBV1", "TRAV2_TRBV2", ""],
+            "value": [1, 2, 3, 4],
+        }
+    ).to_csv(input_path, index=False)
+
+    summary = tb.prefilter_cell_metadata(input_path, output_path, chunksize=2)
+    filtered = pd.read_csv(output_path)
+
+    assert summary["n_input_rows"] == 4
+    assert summary["n_output_rows"] == 1
+    assert filtered.iloc[0]["cell_class"] == "CD8"
+    assert filtered.iloc[0]["value"] == 1
+    assert output_path.with_suffix(".prefilter_summary.csv").exists()

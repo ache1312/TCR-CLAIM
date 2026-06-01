@@ -26,6 +26,8 @@ tcr-claim-tables = "tcrbio.cli:run_tables_main"
 tcr-claim-batch = "tcrbio.cli:run_batch_main"
 tcr-claim-supplements = "tcrbio.cli:supplements_main"
 tcr-claim-figures = "tcrbio.cli:figures_main"
+tcr-claim-audit = "tcrbio.cli:audit_main"
+tcr-claim-prefilter = "tcrbio.cli:prefilter_main"
 tcr-claim-validate = "tcrbio.cli:validate_main"
 tcr-claim-validate-batch = "tcrbio.cli:validate_batch_main"
 
