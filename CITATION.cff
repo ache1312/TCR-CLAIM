@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use tcrbio or TCR-CLAIM, please cite this software and the associated manuscript/preprint."
+title: "TCR-CLAIM: Candidate-Level Assessment and Interpretation of single-cell TCR biology"
+version: 0.1.0
+authors:
+  - name: "Clonotype benchmark team"
+date-released: 2026-06-01
+repository-code: "https://github.com/ache1312/TCR-CLAIM"
+license: MIT

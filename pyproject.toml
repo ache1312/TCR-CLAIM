@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcrbio"
+version = "0.1.0"
+description = "Auditable biological interpretation of single-cell TCR clone candidates."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+  {name = "Clonotype benchmark team"}
+]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0"
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+report = ["jinja2>=3"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tcrbio*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

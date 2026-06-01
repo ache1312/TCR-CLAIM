@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Generated outputs
+demo_outputs/
+validation/
+clone_cards.html
+
+# Local data and archives
+data/
+results/
+*.h5ad
+*.h5
+*.rds
+*.RData
+*.gz
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
