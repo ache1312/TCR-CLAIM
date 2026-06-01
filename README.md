@@ -63,3 +63,28 @@ tb.report_clone_cards(claims, output="clone_cards.html")
 ```bash
 python -m pytest
 ```
+
+## CLI
+
+Generate TCR-CLAIM tables from an existing benchmark cell metadata table:
+
+```bash
+python scripts/run_tcr_claim_tables.py \
+  --input /path/to/cell_metadata_with_tcr.csv \
+  --out tcr_claim_outputs
+```
+
+Validate Python metrics against R benchmark outputs:
+
+```bash
+python scripts/validate_against_r_benchmark.py \
+  --results-dir /path/to/results/io_dataset \
+  --out validation/io_dataset_validation_summary.csv
+```
+
+After installing the package, the equivalent entry points are:
+
+```bash
+tcr-claim-tables --input cell_metadata_with_tcr.csv --out tcr_claim_outputs
+tcr-claim-validate --results-dir results/io_dataset --out validation.csv
+```

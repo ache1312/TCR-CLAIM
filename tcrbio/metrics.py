@@ -5,6 +5,8 @@ from itertools import combinations
 import numpy as np
 import pandas as pd
 
+from .filters import primary_tcr_cells
+
 
 DEFAULT_CONTEXT = ["dataset_id", "cancer_type", "donor_id", "sample_id", "tissue_type", "cell_class"]
 DEFAULT_SHARING_CONTEXT = ["dataset_id", "cancer_type", "donor_id", "cell_class"]
@@ -39,6 +41,7 @@ def collapse_risk(
     relaxed_key: str = "ct_vgene",
     strict_key: str = "ct_strict",
     groupby: list[str] | None = None,
+    primary_only: bool = True,
     low_risk_fraction: float = 0.90,
     medium_risk_fraction: float = 0.70,
 ) -> pd.DataFrame:
@@ -46,8 +49,10 @@ def collapse_risk(
 
     groupby = DEFAULT_CONTEXT if groupby is None else groupby
     df = pd.DataFrame(tcr).copy()
-    keep = df[relaxed_key].notna() & df[strict_key].notna()
-    df = df[keep]
+    if primary_only:
+        df = primary_tcr_cells(df, strict_key=strict_key, relaxed_key=relaxed_key)
+    else:
+        df = df[df[relaxed_key].notna() & df[strict_key].notna()]
     rows = []
 
     for context, group in _iter_groups(df, groupby + [relaxed_key]):
@@ -98,13 +103,17 @@ def clone_count_agreement(
     groupby: list[str] | None = None,
     thresholds: list[int] | None = None,
     include_top10: bool = True,
+    primary_only: bool = True,
 ) -> pd.DataFrame:
     """Compare strict clone counts with relaxed V-gene group counts."""
 
     groupby = DEFAULT_CONTEXT if groupby is None else groupby
     thresholds = [1, 2, 5, 10] if thresholds is None else thresholds
     df = pd.DataFrame(tcr).copy()
-    df = df[df[strict_key].notna() & df[relaxed_key].notna()]
+    if primary_only:
+        df = primary_tcr_cells(df, strict_key=strict_key, relaxed_key=relaxed_key)
+    else:
+        df = df[df[strict_key].notna() & df[relaxed_key].notna()]
     rows = []
 
     for context, group in _iter_groups(df, groupby):
@@ -181,13 +190,18 @@ def tissue_sharing(
     tissue_col: str = "tissue_type",
     groupby: list[str] | None = None,
     thresholds: list[int] | None = None,
+    primary_only: bool = True,
 ) -> pd.DataFrame:
     """Separate strict sharing from relaxed apparent-only sharing."""
 
     groupby = DEFAULT_SHARING_CONTEXT if groupby is None else groupby
     thresholds = [1, 2, 5, 10] if thresholds is None else thresholds
     df = pd.DataFrame(tcr).copy()
-    df = df[df[strict_key].notna() & df[relaxed_key].notna() & df[tissue_col].notna()]
+    if primary_only:
+        df = primary_tcr_cells(df, strict_key=strict_key, relaxed_key=relaxed_key)
+    else:
+        df = df[df[strict_key].notna() & df[relaxed_key].notna()]
+    df = df[df[tissue_col].notna()]
     rows = []
 
     for context, group in _iter_groups(df, groupby):
@@ -209,6 +223,9 @@ def tissue_sharing(
                 backed_n = int(relaxed_shared[relaxed_key].isin(strict_shared_vgenes).sum())
                 strict_shared_n = int(len(strict_shared))
                 relaxed_shared_n = int(len(relaxed_shared))
+                strict_shared_median_size = (
+                    float(strict_shared["clone_size"].median()) if strict_shared_n and "clone_size" in strict_shared else np.nan
+                )
 
                 rows.append(
                     {
@@ -224,10 +241,17 @@ def tissue_sharing(
                         "vgene_shared_strict_backed": backed_n,
                         "vgene_shared_apparent_only": relaxed_shared_n - backed_n,
                         "strict_shared_recovered_by_vgene": strict_recovered_n,
+                        "strict_sharing_jaccard": strict_shared_n / len(strict_presence)
+                        if len(strict_presence)
+                        else np.nan,
+                        "vgene_sharing_jaccard": relaxed_shared_n / len(relaxed_presence)
+                        if len(relaxed_presence)
+                        else np.nan,
                         "vgene_sharing_precision_like": backed_n / relaxed_shared_n if relaxed_shared_n else np.nan,
                         "strict_sharing_recall_by_vgene": strict_recovered_n / strict_shared_n
                         if strict_shared_n
                         else np.nan,
+                        "strict_shared_median_size": strict_shared_median_size,
                     }
                 )
     return pd.DataFrame(rows)

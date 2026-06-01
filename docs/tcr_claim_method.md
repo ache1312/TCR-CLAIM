@@ -28,6 +28,17 @@ these tables:
 - `sharing_table`: one row per tissue pair, context, and threshold.
 - `claim_table`: one row per auditable biological claim.
 
+## Primary Benchmark Universe
+
+The default TCR-CLAIM metrics mirror the benchmark primary universe:
+
+- `cell_class` is `CD4` or `CD8` when the column exists;
+- `ct_strict` is present;
+- `ct_vgene` is present.
+
+Use the CLI flag `--all-cells` only for exploratory QC when non-CD4/CD8 cells
+or missing cell-class annotations should be retained.
+
 ## Claim Policy
 
 The method explicitly blocks unsupported overclaims.

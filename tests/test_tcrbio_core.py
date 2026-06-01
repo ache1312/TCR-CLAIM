@@ -126,3 +126,23 @@ def test_strict_clone_table_summarizes_confirmed_clones():
 def test_xenium_panel_design_has_core_markers():
     panel = tb.design_xenium_panel_from_candidates()
     assert {"CD3D", "CD8A", "PDCD1", "TOX", "HLA-A"}.issubset(set(panel["target"]))
+
+
+def test_primary_metrics_exclude_non_cd4_cd8_cells():
+    cells = pd.DataFrame(
+        {
+            "dataset_id": "test",
+            "donor_id": "d1",
+            "sample_id": "s1",
+            "tissue_type": "tumor",
+            "cell_class": ["CD8", "NK"],
+            "ct_strict": ["strict_a", "strict_b"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    )
+
+    primary = tb.primary_tcr_cells(cells)
+    agreement = tb.clone_count_agreement(cells, thresholds=[1], include_top10=False)
+
+    assert primary.shape[0] == 1
+    assert agreement["strict_clone_count"].iloc[0] == 1
