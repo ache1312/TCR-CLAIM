@@ -52,6 +52,54 @@ def report_clone_cards(claims: pd.DataFrame, output: str | Path | None = None) -
     return html
 
 
+def report_candidate_cards(
+    *,
+    candidates: pd.DataFrame,
+    candidate_phenotypes: pd.DataFrame | None = None,
+    output: str | Path | None = None,
+    top_n: int = 25,
+) -> str:
+    """Render richer candidate-centered HTML cards for biological review."""
+
+    candidate_df = pd.DataFrame(candidates).copy()
+    phenotype_df = pd.DataFrame() if candidate_phenotypes is None else pd.DataFrame(candidate_phenotypes)
+    if "candidate_rank" in candidate_df.columns:
+        candidate_df = candidate_df.sort_values("candidate_rank")
+    cards = []
+    for _, candidate in candidate_df.head(top_n).iterrows():
+        candidate_id = candidate.get("candidate_id", candidate.get("ct_strict", "candidate"))
+        phenotype_rows = _phenotype_rows_for_candidate(phenotype_df, candidate_id)
+        cards.append(_candidate_card_html(candidate, phenotype_rows))
+
+    html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TCR-CLAIM candidate cards</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 32px; color: #202124; line-height: 1.45; }}
+    .card {{ border: 1px solid #d0d7de; border-radius: 6px; padding: 16px; margin: 16px 0; }}
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 18px; }}
+    .label {{ color: #57606a; font-size: 12px; text-transform: uppercase; }}
+    .value {{ font-weight: 600; overflow-wrap: anywhere; }}
+    h1 {{ margin-bottom: 8px; }}
+    h2 {{ margin-top: 0; font-size: 18px; overflow-wrap: anywhere; }}
+    table {{ border-collapse: collapse; width: 100%; margin-top: 8px; }}
+    th, td {{ border: 1px solid #d0d7de; padding: 6px; text-align: left; font-size: 13px; }}
+    th {{ background: #f6f8fa; }}
+  </style>
+</head>
+<body>
+  <h1>TCR-CLAIM candidate cards</h1>
+  <p>These cards summarize candidate evidence for biological review. They do not claim antigen specificity, tumor reactivity, functional killing, or spatial validation.</p>
+  {''.join(cards)}
+</body>
+</html>"""
+    if output is not None:
+        Path(output).write_text(html, encoding="utf-8")
+    return html
+
+
 def report_markdown_summary(
     *,
     output: str | Path | None = None,
@@ -170,6 +218,65 @@ def report_markdown_summary(
     return markdown
 
 
+def report_batch_summary(summary: pd.DataFrame, output: str | Path | None = None, top_n: int = 20) -> str:
+    """Render a compact Markdown summary for a multi-dataset TCR-CLAIM run."""
+
+    df = pd.DataFrame(summary).copy()
+    sections = [
+        "# TCR-CLAIM Batch Summary",
+        "",
+        "This report summarizes multi-dataset TCR-CLAIM outputs. It is intended for benchmark tracking, supplemental tables, and manuscript triage.",
+        "",
+        "## Interpretation Boundary",
+        "",
+        "- Batch metrics compare candidate evidence across datasets.",
+        "- They do not establish antigen specificity, tumor reactivity, functional killing, or spatial validation.",
+    ]
+    if df.empty:
+        sections.extend(["", "No datasets were processed."])
+    else:
+        passed = int((df.get("status", pd.Series(dtype=object)) == "pass").sum())
+        failed = int((df.get("status", pd.Series(dtype=object)) == "fail").sum())
+        sections.extend(
+            [
+                "",
+                "## Run Status",
+                "",
+                f"- Datasets: {len(df)}",
+                f"- Passed: {passed}",
+                f"- Failed: {failed}",
+                f"- Cells: {_fmt_int(_sum_numeric(df, 'n_cells'))}",
+                f"- Primary CD4/CD8 paired cells: {_fmt_int(_sum_numeric(df, 'n_primary_cd4_cd8_paired'))}",
+                f"- Candidates: {_fmt_int(_sum_numeric(df, 'n_candidates'))}",
+                f"- Apparent relaxed-only sharing calls: {_fmt_int(_sum_numeric(df, 'apparent_relaxed_only_total'))}",
+            ]
+        )
+        table_cols = [
+            column
+            for column in [
+                "result_id",
+                "status",
+                "n_cells",
+                "n_primary_cd4_cd8_paired",
+                "n_candidates",
+                "mean_richness_ratio",
+                "apparent_relaxed_only_total",
+                "candidate_phenotype_scored_rows",
+            ]
+            if column in df.columns
+        ]
+        sections.extend(["", "## Dataset Index", "", _markdown_table(df[table_cols].head(top_n))])
+        failed_df = df[df.get("status", pd.Series(index=df.index, dtype=object)) == "fail"]
+        if not failed_df.empty:
+            fail_cols = [column for column in ["result_id", "failure_reason", "input_path"] if column in failed_df.columns]
+            sections.extend(["", "## Failures", "", _markdown_table(failed_df[fail_cols])])
+
+    markdown = "\n".join(sections).rstrip() + "\n"
+    if output is not None:
+        Path(output).write_text(markdown, encoding="utf-8")
+    return markdown
+
+
 def _sum_numeric(df: pd.DataFrame, column: str) -> float:
     if column not in df.columns:
         return 0.0
@@ -206,3 +313,98 @@ def _markdown_table(df: pd.DataFrame) -> str:
     separator = "| " + " | ".join(["---"] * len(out.columns)) + " |"
     rows = ["| " + " | ".join(row) + " |" for row in out.astype(str).to_numpy()]
     return "\n".join([header, separator, *rows])
+
+
+def _candidate_card_html(candidate: pd.Series, phenotype_rows: pd.DataFrame) -> str:
+    candidate_id = candidate.get("candidate_id", candidate.get("ct_strict", "candidate"))
+    rank = candidate.get("candidate_rank", "")
+    context = " / ".join(
+        str(candidate.get(column))
+        for column in ["dataset_id", "donor_id", "sample_id", "tissue_type", "cell_class"]
+        if column in candidate.index and pd.notna(candidate.get(column))
+    )
+    phenotype_html = _candidate_phenotype_html(phenotype_rows)
+    fields = [
+        ("Rank", rank),
+        ("Context", context),
+        ("Cells", candidate.get("n_cells", "")),
+        ("TRAV-TRBV", candidate.get("ct_vgene", candidate.get("relaxed_group", ""))),
+        ("Collapse Risk", candidate.get("risk_label", "")),
+        ("Dominant Fraction", _fmt_float(candidate.get("dominant_fraction"))),
+        ("Rank Score", _fmt_float(candidate.get("rank_score"))),
+        ("Evidence", candidate.get("evidence_level", "confirmed_clone")),
+    ]
+    field_html = "\n".join(
+        f"""<div><div class="label">{escape(str(label))}</div><div class="value">{escape(str(value))}</div></div>"""
+        for label, value in fields
+    )
+    allowed = escape(str(candidate.get("allowed_claim", "Prioritized strict paired-CDR3 TCR clone candidate.")))
+    blocked = escape(str(candidate.get("not_allowed_claim", "Antigen-specific or tumor-reactive clone without orthogonal validation.")))
+    return f"""
+<section class="card">
+  <h2>#{escape(str(rank))} {escape(str(candidate_id))}</h2>
+  <div class="grid">{field_html}</div>
+  <h3>Phenotype Evidence</h3>
+  {phenotype_html}
+  <h3>Claim Boundary</h3>
+  <p><strong>Allowed:</strong> {allowed}</p>
+  <p><strong>Not allowed:</strong> {blocked}</p>
+</section>"""
+
+
+def _phenotype_rows_for_candidate(phenotype_df: pd.DataFrame, candidate_id: object) -> pd.DataFrame:
+    if phenotype_df.empty or "candidate_id" not in phenotype_df.columns:
+        return pd.DataFrame()
+    return phenotype_df[phenotype_df["candidate_id"] == candidate_id].copy()
+
+
+def _candidate_phenotype_html(rows: pd.DataFrame) -> str:
+    if rows.empty:
+        return "<p>No candidate phenotype table was provided.</p>"
+    status_values = set(rows.get("phenotype_evidence_status", pd.Series(dtype=object)).dropna().astype(str))
+    if status_values == {"no_scores_available"}:
+        return "<p>No phenotype score was available for this candidate. TCR evidence can prioritize the clone, but phenotype association is not evaluable.</p>"
+    columns = [
+        column
+        for column in ["phenotype_state", "score_column", "direction", "candidate_mean", "reference_mean", "delta_mean"]
+        if column in rows.columns
+    ]
+    return _html_table(rows[columns].head(8))
+
+
+def _html_table(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "<p>No rows.</p>"
+    header = "".join(f"<th>{escape(str(column))}</th>" for column in df.columns)
+    rows = []
+    for _, row in df.iterrows():
+        cells = "".join(f"<td>{escape(_fmt_cell(value))}</td>" for value in row)
+        rows.append(f"<tr>{cells}</tr>")
+    return f"<table><thead><tr>{header}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+
+
+def _fmt_cell(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
+
+def _fmt_float(value: object) -> str:
+    if _is_missing(value):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if pd.isna(number):
+        return ""
+    return f"{number:.3f}"
+
+
+def _is_missing(value: object) -> bool:
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False

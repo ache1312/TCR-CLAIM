@@ -336,3 +336,68 @@ def test_markdown_report_summarizes_candidates_and_claim_boundary(tmp_path):
     assert "Not supported by TCR-CLAIM alone" in markdown
     assert "strict_big_clone_identifier" in markdown
     assert report_path.exists()
+
+
+def test_candidate_cards_render_candidate_evidence(tmp_path):
+    candidates = pd.DataFrame(
+        {
+            "candidate_rank": [1],
+            "candidate_id": ["strict_big"],
+            "n_cells": [10],
+            "ct_vgene": ["TRAV8_TRBV13"],
+            "risk_label": ["low"],
+            "dominant_fraction": [0.95],
+            "rank_score": [120.0],
+        }
+    )
+    phenotypes = pd.DataFrame(
+        {
+            "candidate_id": ["strict_big"],
+            "phenotype_state": ["cytotoxic"],
+            "score_column": ["cytotoxic_score"],
+            "direction": ["enriched"],
+            "delta_mean": [1.5],
+            "phenotype_evidence_status": ["scored"],
+        }
+    )
+    output = tmp_path / "candidate_cards.html"
+
+    html = tb.report_candidate_cards(candidates=candidates, candidate_phenotypes=phenotypes, output=output)
+
+    assert "TCR-CLAIM candidate cards" in html
+    assert "strict_big" in html
+    assert "cytotoxic" in html
+    assert "Not allowed" in html
+    assert output.exists()
+
+
+def test_batch_pipeline_writes_global_summary_and_per_dataset_cards(tmp_path):
+    for result_id in ["dataset_a", "dataset_b"]:
+        result_dir = tmp_path / "results" / result_id
+        result_dir.mkdir(parents=True)
+        pd.DataFrame(
+            {
+                "dataset_id": result_id,
+                "cancer_type": "test_cancer",
+                "donor_id": "d1",
+                "sample_id": "s1",
+                "tissue_type": "tumor",
+                "cell_class": "CD8",
+                "ct_strict": ["strict_big", "strict_big", "strict_other"],
+                "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13", "TRAV1_TRBV1"],
+                "cytotoxic_score": [2.0, 2.2, 0.5],
+            }
+        ).to_csv(result_dir / "cell_metadata_with_tcr.csv", index=False)
+
+    out = tmp_path / "batch"
+    summary = tb.run_tcr_claim_batch(
+        tb.discover_result_dirs(tmp_path / "results"),
+        out,
+        phenotype_scores=["cytotoxic_score"],
+    )
+
+    assert set(summary["status"]) == {"pass"}
+    assert int(summary["n_candidates"].sum()) == 4
+    assert (out / "batch_run_summary.csv").exists()
+    assert (out / "batch_report.md").exists()
+    assert (out / "per_dataset" / "dataset_a" / "candidate_cards.html").exists()

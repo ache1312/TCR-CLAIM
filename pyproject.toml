@@ -23,6 +23,7 @@ report = ["jinja2>=3"]
 
 [project.scripts]
 tcr-claim-tables = "tcrbio.cli:run_tables_main"
+tcr-claim-batch = "tcrbio.cli:run_batch_main"
 tcr-claim-validate = "tcrbio.cli:validate_main"
 tcr-claim-validate-batch = "tcrbio.cli:validate_batch_main"
 

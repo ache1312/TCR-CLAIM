@@ -6,25 +6,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import (
-    candidate_phenotype_table,
-    cell_tcr_table,
-    claim_checker,
-    clonal_diversity,
-    clone_count_agreement,
-    collapse_risk,
-    define_clones,
-    design_xenium_panel_from_candidates,
-    export_cdr3_fasta_for_xenium,
-    prioritize_candidates,
-    qc_summary,
-    read_table,
-    report_clone_cards,
-    report_markdown_summary,
-    strict_clone_table,
-    strict_vs_relaxed_diversity,
-    tissue_sharing,
-)
+from .io import read_table
+from .metrics import clone_count_agreement, tissue_sharing
+from .pipeline import discover_result_dirs, run_tcr_claim_batch, run_tcr_claim_pipeline
 
 
 AGREEMENT_KEYS = [
@@ -50,63 +34,57 @@ def run_tables_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--all-cells", action="store_true", help="Disable the primary CD4/CD8 paired-TCR filter.")
     args = parser.parse_args(argv)
 
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-
-    tcr = read_table(args.input)
-    if "ct_strict" not in tcr.columns or "ct_vgene" not in tcr.columns:
-        tcr = define_clones(tcr)
-
-    primary_only = not args.all_cells
-    risk = collapse_risk(tcr, primary_only=primary_only)
-    sharing = tissue_sharing(tcr, tissue_col=args.tissue_col, primary_only=primary_only)
-    qc = qc_summary(tcr)
-    strict_diversity = clonal_diversity(tcr, clone_key="ct_strict", primary_only=primary_only)
-    relaxed_diversity = clonal_diversity(tcr, clone_key="ct_vgene", primary_only=primary_only)
-    diversity_comparison = strict_vs_relaxed_diversity(tcr, primary_only=primary_only)
-    candidates = prioritize_candidates(tcr, risk=risk, primary_only=primary_only)
     phenotype_scores = _split_csv_arg(args.phenotype_scores) if args.phenotype_scores else None
-    candidate_phenotypes = candidate_phenotype_table(
-        tcr,
-        candidates,
-        scores=phenotype_scores,
-        primary_only=primary_only,
-    )
-    claims = claim_checker(tcr=tcr, risk=risk, sharing=sharing, candidates=candidates)
-
-    cell_tcr_table(tcr).to_csv(out / "cell_tcr_table.csv", index=False)
-    qc.to_csv(out / "qc_summary.csv", index=False)
-    strict_clone_table(tcr, primary_only=primary_only).to_csv(out / "strict_clone_table.csv", index=False)
-    risk.to_csv(out / "vgene_group_table.csv", index=False)
-    clone_count_agreement(tcr, primary_only=primary_only).to_csv(out / "clone_count_agreement.csv", index=False)
-    strict_diversity.to_csv(out / "strict_clonal_diversity.csv", index=False)
-    relaxed_diversity.to_csv(out / "relaxed_clonal_diversity.csv", index=False)
-    diversity_comparison.to_csv(out / "strict_vs_relaxed_diversity.csv", index=False)
-    sharing.to_csv(out / "sharing_table.csv", index=False)
-    candidates.to_csv(out / "candidate_table.csv", index=False)
-    candidate_phenotypes.to_csv(out / "candidate_phenotype_table.csv", index=False)
-    claims.to_csv(out / "claim_table.csv", index=False)
-    panel = design_xenium_panel_from_candidates(
-        candidates=candidates,
-        candidate_phenotypes=candidate_phenotypes,
-        include_top_cdr3=args.include_xenium_cdr3,
+    run_tcr_claim_pipeline(
+        args.input,
+        args.out,
+        tissue_col=args.tissue_col,
+        phenotype_scores=phenotype_scores,
+        include_xenium_cdr3=args.include_xenium_cdr3,
         max_cdr3_targets=args.max_cdr3_targets,
+        primary_only=not args.all_cells,
     )
-    panel.to_csv(out / "xenium_panel_roadmap.csv", index=False)
-    if args.include_xenium_cdr3:
-        export_cdr3_fasta_for_xenium(candidates, out / "xenium_cdr3_targets.fasta", max_targets=args.max_cdr3_targets)
-    report_clone_cards(claims, output=out / "clone_cards.html")
-    report_markdown_summary(
-        output=out / "tcr_claim_report.md",
-        qc=qc,
-        diversity=diversity_comparison,
-        candidates=candidates,
-        candidate_phenotypes=candidate_phenotypes,
-        sharing=sharing,
-        claims=claims,
-        risk=risk,
+    print(f"TCR-CLAIM outputs written to {Path(args.out).resolve()}")
+
+
+def run_batch_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run TCR-CLAIM tables across multiple benchmark result directories.")
+    parser.add_argument("--results-root", help="Root directory to search for cell_metadata_with_tcr.csv files.")
+    parser.add_argument("--results", help="Comma-separated result directories.")
+    parser.add_argument("--out", required=True, help="Output root directory for batch outputs.")
+    parser.add_argument("--tissue-col", default="tissue_type")
+    parser.add_argument("--phenotype-scores", default=None, help="Comma-separated phenotype score columns to summarize per candidate.")
+    parser.add_argument("--include-xenium-cdr3", action="store_true", help="Add top candidate CDR3 sequences to each Xenium roadmap and export FASTA.")
+    parser.add_argument("--max-cdr3-targets", type=int, default=20)
+    parser.add_argument("--all-cells", action="store_true", help="Disable the primary CD4/CD8 paired-TCR filter.")
+    parser.add_argument("--fail-on-error", action="store_true", help="Exit non-zero if any dataset fails.")
+    args = parser.parse_args(argv)
+
+    result_dirs = []
+    if args.results:
+        result_dirs.extend(Path(result) for result in _split_csv_arg(args.results))
+    if args.results_root:
+        result_dirs.extend(discover_result_dirs(args.results_root))
+    if not result_dirs:
+        raise SystemExit("Provide --results or --results-root.")
+
+    phenotype_scores = _split_csv_arg(args.phenotype_scores) if args.phenotype_scores else None
+    summary = run_tcr_claim_batch(
+        result_dirs,
+        args.out,
+        tissue_col=args.tissue_col,
+        phenotype_scores=phenotype_scores,
+        include_xenium_cdr3=args.include_xenium_cdr3,
+        max_cdr3_targets=args.max_cdr3_targets,
+        primary_only=not args.all_cells,
+        continue_on_error=True,
     )
-    print(f"TCR-CLAIM outputs written to {out.resolve()}")
+    failures = int((summary["status"] == "fail").sum()) if not summary.empty and "status" in summary.columns else 0
+    print(f"TCR-CLAIM batch outputs written to {Path(args.out).resolve()}")
+    print(f"Datasets processed: {len(summary)}")
+    print(f"Dataset failures: {failures}")
+    if failures and args.fail_on_error:
+        raise SystemExit(1)
 
 
 def validate_main(argv: list[str] | None = None) -> None:

@@ -39,6 +39,8 @@ these tables:
   signatures and candidate-supported states.
 - `xenium_cdr3_targets.fasta`: optional CDR3 target sequences when
   `--include-xenium-cdr3` is explicitly requested.
+- `candidate_cards.html`: candidate-centered evidence cards for biological
+  review.
 - `tcr_claim_report.md`: human-readable run summary.
 
 ## Primary Benchmark Universe
@@ -105,6 +107,23 @@ of phenotype evidence should be explicit in downstream reports.
 
 Phenotype enrichment is descriptive. It does not validate antigen specificity,
 tumor reactivity or functional killing.
+
+## Multi-Dataset Runner
+
+`tcr-claim-batch` runs the same per-dataset workflow across many benchmark
+result directories. It discovers folders containing `cell_metadata_with_tcr.csv`
+under `--results-root`, or accepts explicit folders with `--results`.
+
+Batch outputs:
+
+- `batch_run_summary.csv`: one row per dataset with QC, clone counts, diversity
+  compression, sharing, phenotype-evidence status and candidate counts;
+- `batch_report.md`: compact Markdown index for manuscript and supplement
+  triage;
+- `per_dataset/<result_id>/`: full TCR-CLAIM outputs for each dataset.
+
+By default, the batch runner continues if a dataset fails and records a `fail`
+row. Use `--fail-on-error` when the desired behavior is strict CI-style failure.
 
 ## Diversity Compression
 

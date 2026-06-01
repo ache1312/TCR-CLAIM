@@ -52,7 +52,9 @@ tb.report_clone_cards(claims, output="clone_cards.html")
   phenotype scores.
 - `xenium`: build a candidate/state-aware Xenium marker/CDR3 panel
   specification.
-- `reporting`: render HTML clone cards and Markdown run summaries.
+- `pipeline`: run one dataset or a multi-dataset benchmark batch.
+- `reporting`: render HTML clone cards, candidate cards, and Markdown run
+  summaries.
 - `r/tcrbio_bridge.R`: lightweight R helpers for exchanging canonical tables.
 
 ## Method Name
@@ -95,6 +97,7 @@ After installing the package, the equivalent entry points are:
 
 ```bash
 tcr-claim-tables --input cell_metadata_with_tcr.csv --out tcr_claim_outputs
+tcr-claim-batch --results-root results --out tcr_claim_batch
 tcr-claim-validate --results-dir results/io_dataset --out validation.csv
 tcr-claim-validate-batch --results results/io_dataset,results/gse121637 --out batch_validation.csv
 ```
@@ -135,4 +138,20 @@ The table CLI writes:
 - `xenium_panel_roadmap.csv`
 - `xenium_cdr3_targets.fasta` when `--include-xenium-cdr3` is used
 - `clone_cards.html`
+- `candidate_cards.html`
 - `tcr_claim_report.md`
+
+Run all benchmark result folders under a root directory:
+
+```bash
+tcr-claim-batch \
+  --results-root /path/to/benchmark/results \
+  --out tcr_claim_batch_outputs
+```
+
+The batch CLI writes:
+
+- `batch_run_summary.csv`
+- `batch_report.md`
+- `per_dataset/<result_id>/...` with the same per-dataset outputs as
+  `tcr-claim-tables`
