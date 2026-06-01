@@ -8,6 +8,7 @@ def claim_checker(
     tcr: pd.DataFrame | None = None,
     risk: pd.DataFrame | None = None,
     sharing: pd.DataFrame | None = None,
+    candidates: pd.DataFrame | None = None,
     strict_key: str = "ct_strict",
     relaxed_key: str = "ct_vgene",
 ) -> pd.DataFrame:
@@ -80,5 +81,30 @@ def claim_checker(
                         "reason": "Shared TRAV-TRBV group lacks strict paired CDR3 sharing support.",
                     }
                 )
+
+    if candidates is not None and not candidates.empty:
+        candidate_df = pd.DataFrame(candidates)
+        for _, row in candidate_df.iterrows():
+            rows.append(
+                {
+                    "entity_id": row.get("candidate_id"),
+                    "entity_type": "prioritized_candidate",
+                    "evidence_level": row.get("evidence_level", "confirmed_clone"),
+                    "n_cells": int(row.get("n_cells", 0)),
+                    "candidate_rank": row.get("candidate_rank"),
+                    "rank_score": row.get("rank_score"),
+                    "risk_label": row.get("risk_label"),
+                    "dominant_fraction": row.get("dominant_fraction"),
+                    "allowed_claim": row.get(
+                        "allowed_claim",
+                        "Prioritized strict paired-CDR3 TCR clone candidate for biological review.",
+                    ),
+                    "not_allowed_claim": row.get(
+                        "not_allowed_claim",
+                        "Antigen-specific or tumor-reactive clone without orthogonal validation.",
+                    ),
+                    "reason": "TCR-CLAIM ranking prioritizes candidates but does not provide antigen validation.",
+                }
+            )
 
     return pd.DataFrame(rows)

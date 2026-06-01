@@ -10,7 +10,8 @@ of the clonotype benchmark:
 > clonotypes.
 
 The package keeps strict clonotypes, relaxed V-gene groups, collapse risk,
-sharing calls, phenotype associations, and claim checking separate.
+sharing calls, diversity compression, candidate prioritization, phenotype
+associations, and claim checking separate.
 
 ## Quick Start
 
@@ -41,11 +42,15 @@ tb.report_clone_cards(claims, output="clone_cards.html")
 - `normalize`: choose dominant productive TRA/TRB per cell and keep ambiguity
   flags.
 - `definitions`: build `ct_strict` and `ct_vgene` with explicit evidence levels.
+- `qc`: summarize paired-TCR eligibility and multi-chain ambiguity.
+- `diversity`: compare strict versus relaxed repertoire diversity.
 - `metrics`: compute collapse risk, clone count agreement, and strict/apparent
   tissue sharing.
+- `prioritize`: rank strict candidate clones for biological review.
 - `claims`: generate allowed and not-allowed biological claim statements.
 - `phenotype`: associate strict clone expansion with phenotype scores.
 - `xenium`: build a candidate Xenium marker/CDR3 panel specification.
+- `reporting`: render HTML clone cards and Markdown run summaries.
 - `r/tcrbio_bridge.R`: lightweight R helpers for exchanging canonical tables.
 
 ## Method Name
@@ -56,6 +61,8 @@ tb.report_clone_cards(claims, output="clone_cards.html")
 - relaxed `TRAV-TRBV` candidate groups;
 - low/medium/high V-gene collapse risk;
 - strict versus apparent tissue sharing;
+- strict versus relaxed diversity compression;
+- prioritized clone candidates;
 - allowed versus unsupported biological claims.
 
 ## Run Tests
@@ -87,4 +94,22 @@ After installing the package, the equivalent entry points are:
 ```bash
 tcr-claim-tables --input cell_metadata_with_tcr.csv --out tcr_claim_outputs
 tcr-claim-validate --results-dir results/io_dataset --out validation.csv
+tcr-claim-validate-batch --results results/io_dataset,results/gse121637 --out batch_validation.csv
 ```
+
+The table CLI writes:
+
+- `cell_tcr_table.csv`
+- `qc_summary.csv`
+- `strict_clone_table.csv`
+- `vgene_group_table.csv`
+- `clone_count_agreement.csv`
+- `strict_clonal_diversity.csv`
+- `relaxed_clonal_diversity.csv`
+- `strict_vs_relaxed_diversity.csv`
+- `sharing_table.csv`
+- `candidate_table.csv`
+- `claim_table.csv`
+- `xenium_panel_roadmap.csv`
+- `clone_cards.html`
+- `tcr_claim_report.md`

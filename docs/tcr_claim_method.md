@@ -23,10 +23,17 @@ TCR-CLAIM is table-first. It can operate on AnnData later, but the MVP requires
 these tables:
 
 - `cell_tcr_table`: one row per cell with dominant TRA/TRB and clone keys.
+- `qc_summary`: paired-TCR eligibility, CD4/CD8 primary universe and multi-chain
+  ambiguity per context.
 - `strict_clone_table`: one row per strict clone and context.
 - `vgene_group_table`: one row per `TRAV-TRBV` group and context.
+- `strict_clonal_diversity`: strict paired-CDR3 repertoire diversity per context.
+- `relaxed_clonal_diversity`: relaxed `TRAV-TRBV` repertoire diversity per context.
+- `strict_vs_relaxed_diversity`: compression created by using relaxed groups.
 - `sharing_table`: one row per tissue pair, context, and threshold.
+- `candidate_table`: prioritized strict clone candidates for biological review.
 - `claim_table`: one row per auditable biological claim.
+- `tcr_claim_report.md`: human-readable run summary.
 
 ## Primary Benchmark Universe
 
@@ -56,6 +63,35 @@ Not allowed without additional validation:
 - "tumor-reactive clone";
 - "functional killing clone";
 - "confirmed shared clonotype" for relaxed-only sharing.
+
+## Candidate Ranking
+
+`candidate_table` is a triage table, not a tumor-reactivity model.
+
+The current score prioritizes:
+
+- larger strict paired-CDR3 clones;
+- tumor and CD8 contexts when `focus="tumor_cd8"`;
+- relaxed groups dominated by the candidate strict clone;
+- lower collapse risk.
+
+The score is intentionally heuristic. It should be used to decide which clones
+deserve biological review, not to infer antigen specificity or function.
+
+## Diversity Compression
+
+`strict_vs_relaxed_diversity` quantifies how much repertoire structure is lost
+when strict paired-CDR3 clonotypes are represented as relaxed `TRAV-TRBV` groups.
+
+Key fields:
+
+- `richness_ratio`: relaxed richness divided by strict richness;
+- `richness_relative_difference`: relative change in clone count;
+- `effective_shannon_ratio`: relaxed/strict effective Shannon diversity;
+- `gini_difference`: change in clone-size inequality.
+
+Low relaxed/strict richness ratios indicate strong compression and should
+increase caution around relaxed-group biological claims.
 
 ## Xenium Roadmap
 

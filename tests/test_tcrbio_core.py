@@ -146,3 +146,123 @@ def test_primary_metrics_exclude_non_cd4_cd8_cells():
 
     assert primary.shape[0] == 1
     assert agreement["strict_clone_count"].iloc[0] == 1
+
+
+def test_qc_summary_reports_primary_eligibility():
+    cells = pd.DataFrame(
+        {
+            "dataset_id": "test",
+            "donor_id": "d1",
+            "sample_id": "s1",
+            "tissue_type": "tumor",
+            "cell_class": ["CD8", "CD4", "NK"],
+            "ct_strict": ["strict_a", "strict_b", "strict_c"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV1_TRBV1", "TRAV2_TRBV2"],
+            "has_multi_tra": [False, True, False],
+            "has_multi_trb": [False, False, True],
+        }
+    )
+
+    qc = tb.qc_summary(cells)
+    row = qc.iloc[0]
+
+    assert row["n_cells"] == 3
+    assert row["n_primary_cd4_cd8_paired"] == 2
+    assert row["multi_tra_rate"] == 1 / 3
+
+
+def test_strict_vs_relaxed_diversity_captures_compression():
+    cells = pd.DataFrame(
+        {
+            "dataset_id": "test",
+            "cancer_type": "breast",
+            "tissue_type": "tumor",
+            "cell_class": "CD8",
+            "ct_strict": ["strict_a", "strict_b", "strict_c"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    )
+
+    diversity = tb.strict_vs_relaxed_diversity(cells)
+    row = diversity.iloc[0]
+
+    assert row["richness_strict"] == 3
+    assert row["richness_relaxed"] == 2
+    assert row["richness_relative_difference"] == -1 / 3
+
+
+def test_strict_vs_relaxed_diversity_handles_empty_primary_universe():
+    cells = pd.DataFrame(
+        {
+            "cell_class": ["NK"],
+            "ct_strict": ["strict_a"],
+            "ct_vgene": ["TRAV8_TRBV13"],
+        }
+    )
+
+    diversity = tb.strict_vs_relaxed_diversity(cells)
+
+    assert diversity.empty
+
+
+def test_prioritize_candidates_prefers_tumor_cd8_large_low_risk_clone():
+    cells = pd.DataFrame(
+        {
+            "dataset_id": "test",
+            "cancer_type": "breast",
+            "donor_id": "d1",
+            "sample_id": "s1",
+            "tissue_type": ["tumor", "tumor", "blood"],
+            "cell_class": ["CD8", "CD8", "CD4"],
+            "ct_strict": ["strict_big", "strict_big", "strict_other"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    )
+
+    candidates = tb.prioritize_candidates(cells)
+
+    assert candidates.iloc[0]["ct_strict"] == "strict_big"
+    assert candidates.iloc[0]["candidate_rank"] == 1
+
+
+def test_prioritize_candidates_handles_missing_tissue_context():
+    cells = pd.DataFrame(
+        {
+            "ct_strict": ["strict_big", "strict_big", "strict_other"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    )
+
+    candidates = tb.prioritize_candidates(cells)
+
+    assert candidates.iloc[0]["ct_strict"] == "strict_big"
+    assert not bool(candidates.iloc[0]["tumor_context"])
+
+
+def test_markdown_report_summarizes_candidates_and_claim_boundary(tmp_path):
+    report_path = tmp_path / "report.md"
+    qc = pd.DataFrame({"n_cells": [3], "n_paired_tcr": [2], "n_primary_cd4_cd8_paired": [2]})
+    candidates = pd.DataFrame(
+        {
+            "candidate_rank": [1],
+            "candidate_id": ["strict_big_clone_identifier"],
+            "n_cells": [10],
+            "tissue_type": ["tumor"],
+            "cell_class": ["CD8"],
+            "risk_label": ["low"],
+            "rank_score": [120.0],
+        }
+    )
+    claims = pd.DataFrame(
+        {
+            "entity_type": ["prioritized_candidate"],
+            "evidence_level": ["confirmed_clone"],
+        }
+    )
+
+    markdown = tb.report_markdown_summary(output=report_path, qc=qc, candidates=candidates, claims=claims)
+
+    assert "TCR-CLAIM Run Summary" in markdown
+    assert "Not supported by TCR-CLAIM alone" in markdown
+    assert "strict_big_clone_identifier" in markdown
+    assert report_path.exists()
