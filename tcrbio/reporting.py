@@ -58,6 +58,7 @@ def report_markdown_summary(
     qc: pd.DataFrame | None = None,
     diversity: pd.DataFrame | None = None,
     candidates: pd.DataFrame | None = None,
+    candidate_phenotypes: pd.DataFrame | None = None,
     sharing: pd.DataFrame | None = None,
     claims: pd.DataFrame | None = None,
     risk: pd.DataFrame | None = None,
@@ -135,6 +136,23 @@ def report_markdown_summary(
         if "candidate_id" in top.columns:
             top["candidate_id"] = top["candidate_id"].map(_shorten)
         sections.extend(["", "## Prioritized Candidates", "", _markdown_table(top)])
+
+    phenotype_df = pd.DataFrame() if candidate_phenotypes is None else pd.DataFrame(candidate_phenotypes)
+    if not phenotype_df.empty:
+        sections.extend(["", "## Candidate Phenotypes", ""])
+        status_counts = phenotype_df["phenotype_evidence_status"].value_counts(dropna=False).rename_axis("status").reset_index(name="n_rows")
+        sections.append(_markdown_table(status_counts))
+        enriched = phenotype_df[phenotype_df.get("direction", pd.Series(index=phenotype_df.index, dtype=object)) == "enriched"]
+        if not enriched.empty:
+            columns = [
+                column
+                for column in ["candidate_rank", "candidate_id", "phenotype_state", "score_column", "delta_mean"]
+                if column in enriched.columns
+            ]
+            top_enriched = enriched.sort_values("delta_mean", ascending=False)[columns].head(top_n).copy()
+            if "candidate_id" in top_enriched.columns:
+                top_enriched["candidate_id"] = top_enriched["candidate_id"].map(_shorten)
+            sections.extend(["", "Top enriched phenotype shifts:", "", _markdown_table(top_enriched)])
 
     claim_df = pd.DataFrame() if claims is None else pd.DataFrame(claims)
     if not claim_df.empty and {"entity_type", "evidence_level"}.issubset(claim_df.columns):

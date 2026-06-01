@@ -32,7 +32,13 @@ these tables:
 - `strict_vs_relaxed_diversity`: compression created by using relaxed groups.
 - `sharing_table`: one row per tissue pair, context, and threshold.
 - `candidate_table`: prioritized strict clone candidates for biological review.
+- `candidate_phenotype_table`: descriptive phenotype score shifts for each
+  prioritized candidate when score columns are available.
 - `claim_table`: one row per auditable biological claim.
+- `xenium_panel_roadmap`: spatial validation targets informed by default immune
+  signatures and candidate-supported states.
+- `xenium_cdr3_targets.fasta`: optional CDR3 target sequences when
+  `--include-xenium-cdr3` is explicitly requested.
 - `tcr_claim_report.md`: human-readable run summary.
 
 ## Primary Benchmark Universe
@@ -78,6 +84,28 @@ The current score prioritizes:
 The score is intentionally heuristic. It should be used to decide which clones
 deserve biological review, not to infer antigen specificity or function.
 
+## Candidate Phenotype Table
+
+`candidate_phenotype_table` connects TCR candidates to scRNA-derived phenotype
+scores when those scores are present in the input table or passed with
+`--phenotype-scores`.
+
+For each prioritized strict clone candidate and score column, it reports:
+
+- candidate cells in the same biological context;
+- reference cells from the same context excluding that candidate;
+- candidate mean and median;
+- reference mean and median;
+- `delta_mean`;
+- `direction`: `enriched`, `depleted`, `no_clear_shift` or `not_evaluable`.
+
+If no phenotype scores are available, the table still records
+`phenotype_evidence_status = no_scores_available`. This is intentional: absence
+of phenotype evidence should be explicit in downstream reports.
+
+Phenotype enrichment is descriptive. It does not validate antigen specificity,
+tumor reactivity or functional killing.
+
 ## Diversity Compression
 
 `strict_vs_relaxed_diversity` quantifies how much repertoire structure is lost
@@ -102,3 +130,11 @@ TCR-CLAIM treats Xenium as a validation roadmap:
 3. design a spatial panel;
 4. test spatial location, neighborhoods, and tumor proximity;
 5. keep antigen specificity separate from spatial support.
+
+When candidate phenotype scores are available, `xenium_panel_roadmap` marks
+matching state signatures as `candidate_supported`. Otherwise, it remains a
+default immune/spatial roadmap and does not claim candidate-state support.
+
+CDR3 FASTA export is opt-in. It should be treated as an experimental advanced
+custom design input, not as evidence that Xenium will detect the clone or that
+the clone is tumor-reactive.

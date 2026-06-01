@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from . import (
+    candidate_phenotype_table,
     cell_tcr_table,
     claim_checker,
     clonal_diversity,
@@ -14,6 +15,7 @@ from . import (
     collapse_risk,
     define_clones,
     design_xenium_panel_from_candidates,
+    export_cdr3_fasta_for_xenium,
     prioritize_candidates,
     qc_summary,
     read_table,
@@ -42,6 +44,9 @@ def run_tables_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--input", required=True, help="CSV/TSV cell metadata with ct_strict and ct_vgene.")
     parser.add_argument("--out", required=True, help="Output directory.")
     parser.add_argument("--tissue-col", default="tissue_type")
+    parser.add_argument("--phenotype-scores", default=None, help="Comma-separated phenotype score columns to summarize per candidate.")
+    parser.add_argument("--include-xenium-cdr3", action="store_true", help="Add top candidate CDR3 sequences to the Xenium roadmap and export FASTA.")
+    parser.add_argument("--max-cdr3-targets", type=int, default=20, help="Maximum CDR3 targets for optional Xenium advanced design.")
     parser.add_argument("--all-cells", action="store_true", help="Disable the primary CD4/CD8 paired-TCR filter.")
     args = parser.parse_args(argv)
 
@@ -60,6 +65,13 @@ def run_tables_main(argv: list[str] | None = None) -> None:
     relaxed_diversity = clonal_diversity(tcr, clone_key="ct_vgene", primary_only=primary_only)
     diversity_comparison = strict_vs_relaxed_diversity(tcr, primary_only=primary_only)
     candidates = prioritize_candidates(tcr, risk=risk, primary_only=primary_only)
+    phenotype_scores = _split_csv_arg(args.phenotype_scores) if args.phenotype_scores else None
+    candidate_phenotypes = candidate_phenotype_table(
+        tcr,
+        candidates,
+        scores=phenotype_scores,
+        primary_only=primary_only,
+    )
     claims = claim_checker(tcr=tcr, risk=risk, sharing=sharing, candidates=candidates)
 
     cell_tcr_table(tcr).to_csv(out / "cell_tcr_table.csv", index=False)
@@ -72,14 +84,24 @@ def run_tables_main(argv: list[str] | None = None) -> None:
     diversity_comparison.to_csv(out / "strict_vs_relaxed_diversity.csv", index=False)
     sharing.to_csv(out / "sharing_table.csv", index=False)
     candidates.to_csv(out / "candidate_table.csv", index=False)
+    candidate_phenotypes.to_csv(out / "candidate_phenotype_table.csv", index=False)
     claims.to_csv(out / "claim_table.csv", index=False)
-    design_xenium_panel_from_candidates().to_csv(out / "xenium_panel_roadmap.csv", index=False)
+    panel = design_xenium_panel_from_candidates(
+        candidates=candidates,
+        candidate_phenotypes=candidate_phenotypes,
+        include_top_cdr3=args.include_xenium_cdr3,
+        max_cdr3_targets=args.max_cdr3_targets,
+    )
+    panel.to_csv(out / "xenium_panel_roadmap.csv", index=False)
+    if args.include_xenium_cdr3:
+        export_cdr3_fasta_for_xenium(candidates, out / "xenium_cdr3_targets.fasta", max_targets=args.max_cdr3_targets)
     report_clone_cards(claims, output=out / "clone_cards.html")
     report_markdown_summary(
         output=out / "tcr_claim_report.md",
         qc=qc,
         diversity=diversity_comparison,
         candidates=candidates,
+        candidate_phenotypes=candidate_phenotypes,
         sharing=sharing,
         claims=claims,
         risk=risk,

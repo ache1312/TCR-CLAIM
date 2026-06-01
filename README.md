@@ -48,8 +48,10 @@ tb.report_clone_cards(claims, output="clone_cards.html")
   tissue sharing.
 - `prioritize`: rank strict candidate clones for biological review.
 - `claims`: generate allowed and not-allowed biological claim statements.
-- `phenotype`: associate strict clone expansion with phenotype scores.
-- `xenium`: build a candidate Xenium marker/CDR3 panel specification.
+- `phenotype`: associate strict clone expansion and prioritized candidates with
+  phenotype scores.
+- `xenium`: build a candidate/state-aware Xenium marker/CDR3 panel
+  specification.
 - `reporting`: render HTML clone cards and Markdown run summaries.
 - `r/tcrbio_bridge.R`: lightweight R helpers for exchanging canonical tables.
 
@@ -97,6 +99,25 @@ tcr-claim-validate --results-dir results/io_dataset --out validation.csv
 tcr-claim-validate-batch --results results/io_dataset,results/gse121637 --out batch_validation.csv
 ```
 
+Optional phenotype scores can be summarized per prioritized candidate:
+
+```bash
+tcr-claim-tables \
+  --input cell_metadata_with_tcr.csv \
+  --out tcr_claim_outputs \
+  --phenotype-scores cytotoxic_score,exhaustion_score,progenitor_score
+```
+
+Optional Xenium CDR3 targets can be exported for advanced custom design review:
+
+```bash
+tcr-claim-tables \
+  --input cell_metadata_with_tcr.csv \
+  --out tcr_claim_outputs \
+  --include-xenium-cdr3 \
+  --max-cdr3-targets 20
+```
+
 The table CLI writes:
 
 - `cell_tcr_table.csv`
@@ -109,7 +130,9 @@ The table CLI writes:
 - `strict_vs_relaxed_diversity.csv`
 - `sharing_table.csv`
 - `candidate_table.csv`
+- `candidate_phenotype_table.csv`
 - `claim_table.csv`
 - `xenium_panel_roadmap.csv`
+- `xenium_cdr3_targets.fasta` when `--include-xenium-cdr3` is used
 - `clone_cards.html`
 - `tcr_claim_report.md`

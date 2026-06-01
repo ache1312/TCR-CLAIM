@@ -9,7 +9,7 @@ from .qc import qc_summary
 from .diversity import clonal_diversity, strict_vs_relaxed_diversity
 from .prioritize import prioritize_candidates
 from .tables import cell_tcr_table, strict_clone_table
-from .phenotype import clone_phenotype_association
+from .phenotype import candidate_phenotype_table, clone_phenotype_association, infer_phenotype_score_columns
 from .claims import claim_checker
 from .reporting import report_clone_cards, report_markdown_summary
 from .xenium import design_xenium_panel_from_candidates, export_cdr3_fasta_for_xenium
@@ -29,7 +29,9 @@ __all__ = [
     "tissue_sharing",
     "cell_tcr_table",
     "strict_clone_table",
+    "candidate_phenotype_table",
     "clone_phenotype_association",
+    "infer_phenotype_score_columns",
     "claim_checker",
     "report_clone_cards",
     "report_markdown_summary",

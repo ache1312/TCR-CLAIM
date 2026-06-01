@@ -128,6 +128,37 @@ def test_xenium_panel_design_has_core_markers():
     assert {"CD3D", "CD8A", "PDCD1", "TOX", "HLA-A"}.issubset(set(panel["target"]))
 
 
+def test_xenium_panel_marks_candidate_supported_state_genes():
+    phenotypes = pd.DataFrame(
+        {
+            "candidate_rank": [1],
+            "candidate_id": ["strict_big"],
+            "phenotype_state": ["cytotoxic"],
+            "direction": ["enriched"],
+        }
+    )
+
+    panel = tb.design_xenium_panel_from_candidates(candidate_phenotypes=phenotypes)
+    gzmb = panel[panel["target"] == "GZMB"].iloc[0]
+
+    assert "candidate_state:cytotoxic" in gzmb["source"]
+    assert gzmb["priority"] in {"candidate_supported", "roadmap"}
+
+
+def test_xenium_cdr3_fasta_uses_candidate_table_sequences(tmp_path):
+    candidates = pd.DataFrame(
+        {
+            "candidate_id": ["strict_big"],
+            "trb_cdr3_nt": ["TGTGCCAGC"],
+        }
+    )
+    output = tmp_path / "cdr3.fasta"
+
+    tb.export_cdr3_fasta_for_xenium(candidates, output)
+
+    assert output.read_text(encoding="utf-8") == ">strict_big\nTGTGCCAGC\n"
+
+
 def test_primary_metrics_exclude_non_cd4_cd8_cells():
     cells = pd.DataFrame(
         {
@@ -237,6 +268,45 @@ def test_prioritize_candidates_handles_missing_tissue_context():
 
     assert candidates.iloc[0]["ct_strict"] == "strict_big"
     assert not bool(candidates.iloc[0]["tumor_context"])
+
+
+def test_candidate_phenotype_table_reports_contextual_score_shift():
+    cells = pd.DataFrame(
+        {
+            "dataset_id": "test",
+            "cancer_type": "breast",
+            "donor_id": "d1",
+            "sample_id": "s1",
+            "tissue_type": "tumor",
+            "cell_class": "CD8",
+            "ct_strict": ["strict_big", "strict_big", "strict_other", "strict_other"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13", "TRAV1_TRBV1", "TRAV1_TRBV1"],
+            "cytotoxic_score": [2.0, 2.2, 0.5, 0.7],
+        }
+    )
+    candidates = tb.prioritize_candidates(cells)
+
+    phenotypes = tb.candidate_phenotype_table(cells, candidates, scores=["cytotoxic_score"])
+    row = phenotypes[phenotypes["candidate_id"] == "strict_big"].iloc[0]
+
+    assert row["phenotype_state"] == "cytotoxic"
+    assert row["direction"] == "enriched"
+    assert round(row["delta_mean"], 2) == 1.5
+
+
+def test_candidate_phenotype_table_is_explicit_when_scores_are_absent():
+    cells = pd.DataFrame(
+        {
+            "ct_strict": ["strict_big", "strict_big"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV8_TRBV13"],
+        }
+    )
+    candidates = tb.prioritize_candidates(cells)
+
+    phenotypes = tb.candidate_phenotype_table(cells, candidates)
+
+    assert phenotypes.iloc[0]["phenotype_evidence_status"] == "no_scores_available"
+    assert phenotypes.iloc[0]["direction"] == "not_evaluable"
 
 
 def test_markdown_report_summarizes_candidates_and_claim_boundary(tmp_path):
