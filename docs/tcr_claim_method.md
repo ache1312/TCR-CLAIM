@@ -120,10 +120,49 @@ Batch outputs:
   compression, sharing, phenotype-evidence status and candidate counts;
 - `batch_report.md`: compact Markdown index for manuscript and supplement
   triage;
+- `supplement_tables/`: manuscript-ready aggregate tables;
+- `figures/`: lightweight SVG figures generated from batch summaries;
 - `per_dataset/<result_id>/`: full TCR-CLAIM outputs for each dataset.
 
 By default, the batch runner continues if a dataset fails and records a `fail`
 row. Use `--fail-on-error` when the desired behavior is strict CI-style failure.
+
+The CLI also applies a default `--max-input-rows 2000000` guard. Datasets above
+that size are recorded as `skip_large_input` rather than silently producing
+multi-GB intermediate files. Use `--max-input-rows 0` only for intentional large
+dataset runs or after implementing a streaming/pre-filtered workflow.
+
+## Supplemental Tables
+
+The supplement generator turns a batch output root into:
+
+- `supp_dataset_qc.csv`: dataset-level QC, clone counts, diversity compression,
+  sharing counts and phenotype-evidence status;
+- `supp_collapse_risk.csv`: all relaxed `TRAV-TRBV` groups and collapse-risk
+  metrics;
+- `supp_diversity_compression.csv`: strict versus relaxed diversity metrics per
+  context;
+- `supp_sharing_apparent_vs_strict.csv`: strict-backed versus apparent-only
+  sharing per tissue pair;
+- `supp_candidate_index.csv`: prioritized candidate index across datasets;
+- `supp_claim_inventory.csv`: claim counts by entity type and evidence level.
+
+These are descriptive benchmark tables. They are not antigen-specificity or
+functional-validation results.
+
+## Reproducible Figures
+
+The figure generator writes SVGs directly from batch outputs:
+
+- relaxed/strict richness ratio by dataset;
+- apparent relaxed-only sharing by dataset;
+- candidate count by dataset;
+- collapse-risk distribution;
+- TCR-CLAIM workflow schematic.
+
+The figures are intentionally lightweight and dependency-free. They are meant as
+first-pass manuscript/supplement figures that can later be restyled for journal
+submission.
 
 ## Diversity Compression
 

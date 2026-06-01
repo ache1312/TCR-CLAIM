@@ -9,6 +9,8 @@ import pandas as pd
 from .io import read_table
 from .metrics import clone_count_agreement, tissue_sharing
 from .pipeline import discover_result_dirs, run_tcr_claim_batch, run_tcr_claim_pipeline
+from .figures import create_benchmark_figures
+from .supplements import create_supplement_tables
 
 
 AGREEMENT_KEYS = [
@@ -56,7 +58,10 @@ def run_batch_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--phenotype-scores", default=None, help="Comma-separated phenotype score columns to summarize per candidate.")
     parser.add_argument("--include-xenium-cdr3", action="store_true", help="Add top candidate CDR3 sequences to each Xenium roadmap and export FASTA.")
     parser.add_argument("--max-cdr3-targets", type=int, default=20)
+    parser.add_argument("--max-input-rows", type=int, default=2_000_000, help="Skip datasets above this row count during batch runs. Use 0 to disable.")
     parser.add_argument("--all-cells", action="store_true", help="Disable the primary CD4/CD8 paired-TCR filter.")
+    parser.add_argument("--skip-supplements", action="store_true", help="Do not write supplement_tables/ after batch completion.")
+    parser.add_argument("--skip-figures", action="store_true", help="Do not write figures/ after batch completion.")
     parser.add_argument("--fail-on-error", action="store_true", help="Exit non-zero if any dataset fails.")
     args = parser.parse_args(argv)
 
@@ -69,6 +74,7 @@ def run_batch_main(argv: list[str] | None = None) -> None:
         raise SystemExit("Provide --results or --results-root.")
 
     phenotype_scores = _split_csv_arg(args.phenotype_scores) if args.phenotype_scores else None
+    max_input_rows = None if args.max_input_rows == 0 else args.max_input_rows
     summary = run_tcr_claim_batch(
         result_dirs,
         args.out,
@@ -78,6 +84,9 @@ def run_batch_main(argv: list[str] | None = None) -> None:
         max_cdr3_targets=args.max_cdr3_targets,
         primary_only=not args.all_cells,
         continue_on_error=True,
+        write_supplements=not args.skip_supplements,
+        write_figures=not args.skip_figures,
+        max_input_rows=max_input_rows,
     )
     failures = int((summary["status"] == "fail").sum()) if not summary.empty and "status" in summary.columns else 0
     print(f"TCR-CLAIM batch outputs written to {Path(args.out).resolve()}")
@@ -85,6 +94,28 @@ def run_batch_main(argv: list[str] | None = None) -> None:
     print(f"Dataset failures: {failures}")
     if failures and args.fail_on_error:
         raise SystemExit(1)
+
+
+def supplements_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Generate TCR-CLAIM supplemental tables from a batch output root.")
+    parser.add_argument("--batch-root", required=True, help="Directory containing batch_run_summary.csv and per_dataset/.")
+    parser.add_argument("--out", help="Output directory. Defaults to <batch-root>/supplement_tables.")
+    args = parser.parse_args(argv)
+
+    outputs = create_supplement_tables(args.batch_root, args.out)
+    destination = Path(args.out) if args.out else Path(args.batch_root) / "supplement_tables"
+    print(f"Wrote {len(outputs)} supplemental tables to {destination.resolve()}")
+
+
+def figures_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Generate TCR-CLAIM SVG figures from a batch output root.")
+    parser.add_argument("--batch-root", required=True, help="Directory containing batch_run_summary.csv.")
+    parser.add_argument("--out", help="Output directory. Defaults to <batch-root>/figures.")
+    args = parser.parse_args(argv)
+
+    outputs = create_benchmark_figures(args.batch_root, args.out)
+    destination = Path(args.out) if args.out else Path(args.batch_root) / "figures"
+    print(f"Wrote {len(outputs)} figures to {destination.resolve()}")
 
 
 def validate_main(argv: list[str] | None = None) -> None:

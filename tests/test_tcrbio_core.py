@@ -400,4 +400,28 @@ def test_batch_pipeline_writes_global_summary_and_per_dataset_cards(tmp_path):
     assert int(summary["n_candidates"].sum()) == 4
     assert (out / "batch_run_summary.csv").exists()
     assert (out / "batch_report.md").exists()
+    assert (out / "supplement_tables" / "supp_dataset_qc.csv").exists()
+    assert (out / "supplement_tables" / "supp_candidate_index.csv").exists()
+    assert (out / "figures" / "fig_richness_ratio_by_dataset.svg").exists()
+    assert (out / "figures" / "fig_tcr_claim_flow.svg").exists()
     assert (out / "per_dataset" / "dataset_a" / "candidate_cards.html").exists()
+
+
+def test_batch_pipeline_can_skip_large_inputs(tmp_path):
+    result_dir = tmp_path / "results" / "too_large"
+    result_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "ct_strict": ["strict_a", "strict_b"],
+            "ct_vgene": ["TRAV8_TRBV13", "TRAV1_TRBV1"],
+        }
+    ).to_csv(result_dir / "cell_metadata_with_tcr.csv", index=False)
+
+    summary = tb.run_tcr_claim_batch(
+        [result_dir],
+        tmp_path / "batch",
+        max_input_rows=1,
+    )
+
+    assert summary.iloc[0]["status"] == "skip_large_input"
+    assert summary.iloc[0]["n_input_rows"] == 2

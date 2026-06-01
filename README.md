@@ -53,6 +53,8 @@ tb.report_clone_cards(claims, output="clone_cards.html")
 - `xenium`: build a candidate/state-aware Xenium marker/CDR3 panel
   specification.
 - `pipeline`: run one dataset or a multi-dataset benchmark batch.
+- `supplements`: build manuscript/supplement-ready tables from batch outputs.
+- `figures`: build lightweight SVG figures from batch outputs.
 - `reporting`: render HTML clone cards, candidate cards, and Markdown run
   summaries.
 - `r/tcrbio_bridge.R`: lightweight R helpers for exchanging canonical tables.
@@ -98,6 +100,8 @@ After installing the package, the equivalent entry points are:
 ```bash
 tcr-claim-tables --input cell_metadata_with_tcr.csv --out tcr_claim_outputs
 tcr-claim-batch --results-root results --out tcr_claim_batch
+tcr-claim-supplements --batch-root tcr_claim_batch
+tcr-claim-figures --batch-root tcr_claim_batch
 tcr-claim-validate --results-dir results/io_dataset --out validation.csv
 tcr-claim-validate-batch --results results/io_dataset,results/gse121637 --out batch_validation.csv
 ```
@@ -149,9 +153,39 @@ tcr-claim-batch \
   --out tcr_claim_batch_outputs
 ```
 
+By default, batch runs skip inputs above 2,000,000 rows to avoid accidentally
+creating multi-GB intermediate files. Disable that guard only when intentionally
+running a large dataset:
+
+```bash
+tcr-claim-batch \
+  --results-root /path/to/benchmark/results \
+  --out tcr_claim_batch_outputs \
+  --max-input-rows 0
+```
+
 The batch CLI writes:
 
 - `batch_run_summary.csv`
 - `batch_report.md`
+- `supplement_tables/`
+- `figures/`
 - `per_dataset/<result_id>/...` with the same per-dataset outputs as
   `tcr-claim-tables`
+
+Supplemental tables:
+
+- `supp_dataset_qc.csv`
+- `supp_collapse_risk.csv`
+- `supp_diversity_compression.csv`
+- `supp_sharing_apparent_vs_strict.csv`
+- `supp_candidate_index.csv`
+- `supp_claim_inventory.csv`
+
+Figure SVGs:
+
+- `fig_richness_ratio_by_dataset.svg`
+- `fig_apparent_sharing_by_dataset.svg`
+- `fig_candidate_count_by_dataset.svg`
+- `fig_collapse_risk_distribution.svg`
+- `fig_tcr_claim_flow.svg`

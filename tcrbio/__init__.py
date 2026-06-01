@@ -11,8 +11,10 @@ from .prioritize import prioritize_candidates
 from .tables import cell_tcr_table, strict_clone_table
 from .phenotype import candidate_phenotype_table, clone_phenotype_association, infer_phenotype_score_columns
 from .claims import claim_checker
+from .figures import create_benchmark_figures
 from .reporting import report_batch_summary, report_candidate_cards, report_clone_cards, report_markdown_summary
 from .pipeline import discover_result_dirs, run_tcr_claim_batch, run_tcr_claim_pipeline, summarize_tcr_claim_outputs
+from .supplements import create_supplement_tables
 from .xenium import design_xenium_panel_from_candidates, export_cdr3_fasta_for_xenium
 
 __all__ = [
@@ -38,6 +40,8 @@ __all__ = [
     "run_tcr_claim_batch",
     "run_tcr_claim_pipeline",
     "summarize_tcr_claim_outputs",
+    "create_supplement_tables",
+    "create_benchmark_figures",
     "report_clone_cards",
     "report_candidate_cards",
     "report_markdown_summary",

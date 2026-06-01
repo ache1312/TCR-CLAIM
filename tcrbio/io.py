@@ -10,6 +10,7 @@ def read_table(path: str | Path, **kwargs) -> pd.DataFrame:
 
     path = Path(path)
     lower = path.name.lower()
+    kwargs.setdefault("low_memory", False)
     if lower.endswith((".tsv", ".tsv.gz", ".txt", ".txt.gz")):
         return pd.read_csv(path, sep="\t", **kwargs)
     return pd.read_csv(path, **kwargs)

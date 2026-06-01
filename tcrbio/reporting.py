@@ -237,6 +237,7 @@ def report_batch_summary(summary: pd.DataFrame, output: str | Path | None = None
     else:
         passed = int((df.get("status", pd.Series(dtype=object)) == "pass").sum())
         failed = int((df.get("status", pd.Series(dtype=object)) == "fail").sum())
+        skipped = int((df.get("status", pd.Series(dtype=object)).astype(str).str.startswith("skip")).sum())
         sections.extend(
             [
                 "",
@@ -245,6 +246,7 @@ def report_batch_summary(summary: pd.DataFrame, output: str | Path | None = None
                 f"- Datasets: {len(df)}",
                 f"- Passed: {passed}",
                 f"- Failed: {failed}",
+                f"- Skipped: {skipped}",
                 f"- Cells: {_fmt_int(_sum_numeric(df, 'n_cells'))}",
                 f"- Primary CD4/CD8 paired cells: {_fmt_int(_sum_numeric(df, 'n_primary_cd4_cd8_paired'))}",
                 f"- Candidates: {_fmt_int(_sum_numeric(df, 'n_candidates'))}",
@@ -257,6 +259,7 @@ def report_batch_summary(summary: pd.DataFrame, output: str | Path | None = None
                 "result_id",
                 "status",
                 "n_cells",
+                "n_input_rows",
                 "n_primary_cd4_cd8_paired",
                 "n_candidates",
                 "mean_richness_ratio",

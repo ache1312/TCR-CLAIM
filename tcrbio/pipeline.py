@@ -7,12 +7,14 @@ import pandas as pd
 from .claims import claim_checker
 from .definitions import define_clones
 from .diversity import clonal_diversity, strict_vs_relaxed_diversity
+from .figures import create_benchmark_figures
 from .io import read_table
 from .metrics import clone_count_agreement, collapse_risk, tissue_sharing
 from .phenotype import candidate_phenotype_table
 from .prioritize import prioritize_candidates
 from .qc import qc_summary
 from .reporting import report_batch_summary, report_candidate_cards, report_clone_cards, report_markdown_summary
+from .supplements import create_supplement_tables
 from .tables import cell_tcr_table, strict_clone_table
 from .xenium import design_xenium_panel_from_candidates, export_cdr3_fasta_for_xenium
 
@@ -115,6 +117,9 @@ def run_tcr_claim_batch(
     max_cdr3_targets: int = 20,
     primary_only: bool = True,
     continue_on_error: bool = True,
+    write_supplements: bool = True,
+    write_figures: bool = True,
+    max_input_rows: int | None = None,
 ) -> pd.DataFrame:
     """Run TCR-CLAIM across multiple benchmark result directories."""
 
@@ -131,6 +136,18 @@ def run_tcr_claim_batch(
             rows.append(_failed_summary(result_id, input_path, output_dir, "missing cell_metadata_with_tcr.csv"))
             if not continue_on_error:
                 break
+            continue
+        input_rows = _count_csv_rows(input_path)
+        if max_input_rows is not None and input_rows > max_input_rows:
+            rows.append(
+                _skipped_summary(
+                    result_id,
+                    input_path,
+                    output_dir,
+                    input_rows=input_rows,
+                    reason=f"input rows exceed max_input_rows={max_input_rows}",
+                )
+            )
             continue
         try:
             run_tcr_claim_pipeline(
@@ -151,6 +168,10 @@ def run_tcr_claim_batch(
     summary = pd.DataFrame(rows)
     summary.to_csv(out / "batch_run_summary.csv", index=False)
     report_batch_summary(summary, output=out / "batch_report.md")
+    if write_supplements:
+        create_supplement_tables(out)
+    if write_figures:
+        create_benchmark_figures(out)
     return summary
 
 
@@ -238,6 +259,30 @@ def _failed_summary(result_id: str, input_path: Path, output_dir: Path, reason: 
         "output_dir": str(output_dir),
         "failure_reason": reason,
     }
+
+
+def _skipped_summary(
+    result_id: str,
+    input_path: Path,
+    output_dir: Path,
+    *,
+    input_rows: int,
+    reason: str,
+) -> dict[str, object]:
+    return {
+        "result_id": result_id,
+        "status": "skip_large_input",
+        "input_path": str(input_path),
+        "output_dir": str(output_dir),
+        "n_input_rows": input_rows,
+        "failure_reason": reason,
+    }
+
+
+def _count_csv_rows(path: Path) -> int:
+    with path.open("rb") as handle:
+        line_count = sum(chunk.count(b"\n") for chunk in iter(lambda: handle.read(1024 * 1024), b""))
+    return max(line_count - 1, 0)
 
 
 def _safe_path_name(value: str) -> str:
